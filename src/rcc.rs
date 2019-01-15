@@ -15,6 +15,8 @@ pub trait RccExt {
 }
 
 impl RccExt for RCC {
+
+    #[cfg(not(feature = "stm32l47x"))]
     fn constrain(self) -> Rcc {
         Rcc {
             ahb1: AHB1 { _0: () },
@@ -28,7 +30,31 @@ impl RccExt for RCC {
             crrcr: CRRCR { _0: () },
             cfgr: CFGR {
                 hclk: None,
-                hsi48: false,
+                usb48: false,
+                lsi: false,
+                pclk1: None,
+                pclk2: None,
+                sysclk: None,
+                pllcfg: None,
+            },
+        }
+    }
+
+
+    #[cfg(feature = "stm32l47x")]
+    fn constrain(self) -> Rcc {
+        Rcc {
+            ahb1: AHB1 { _0: () },
+            ahb2: AHB2 { _0: () },
+            ahb3: AHB3 { _0: () },
+            apb1r1: APB1R1 { _0: () },
+            apb1r2: APB1R2 { _0: () },
+            apb2: APB2 { _0: () },
+            bdcr: BDCR { _0: () },
+            csr: CSR { _0: () },
+            cfgr: CFGR {
+                hclk: None,
+                usb48: false,
                 lsi: false,
                 pclk1: None,
                 pclk2: None,
@@ -60,6 +86,7 @@ pub struct Rcc {
     /// Control/Status Register
     pub csr: CSR,
     /// Clock recovery RC register
+    #[cfg(not(feature = "stm32l47x"))]
     pub crrcr: CRRCR,
 }
 
@@ -78,10 +105,12 @@ impl CSR {
 }
 
 /// Clock recovery RC register
+#[cfg(not(feature = "stm32l47x"))]
 pub struct CRRCR {
     _0: (),
 }
 
+#[cfg(not(feature = "stm32l47x"))]
 impl CRRCR {
     // TODO remove `allow`
     #[allow(dead_code)]
@@ -89,6 +118,7 @@ impl CRRCR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
         unsafe { &(*RCC::ptr()).crrcr }
     }
+
     pub fn is_hsi48_on(&mut self) -> bool {
         self.crrcr().read().hsi48on().bit()
     }
@@ -228,7 +258,7 @@ const HSI: u32 = 16_000_000; // Hz
 pub struct CFGR {
     hclk: Option<u32>,
     // should we use an option? it can really only be on/off
-    hsi48: bool,
+    usb48: bool,
     lsi: bool,
     pclk1: Option<u32>,
     pclk2: Option<u32>,
@@ -246,10 +276,10 @@ impl CFGR {
         self
     }
 
-    /// Sets HSI48 clock on or off (the default)
-    pub fn hsi48(mut self, on: bool) -> Self
+    /// Enable the 48Mh USB, RNG, SDMMC clock source.
+    pub fn usb48(mut self, on: bool) -> Self
     {
-        self.hsi48 = on;
+        self.usb48 = on;
         self
     }
 
@@ -456,20 +486,25 @@ impl CFGR {
             while rcc.csr.read().lsirdy().bit_is_clear() {}
         }
 
-        // Turn on HSI48 if required
-        if self.hsi48 {
+        // Turn on USB, RNG Clock using the HSI48CLK source (default)
+        if !cfg!(feature = "stm32l47x") && self.usb48 {
             // p. 180 in ref-manual
             rcc.crrcr.modify(|_, w| w.hsi48on().set_bit());
             // Wait until HSI48 is running
             while rcc.crrcr.read().hsi48rdy().bit_is_clear() {}
         }
 
-
-
+        if cfg!(feature = "stm32l47x") && self.usb48 {
+            rcc.cr.modify(|_, w| w.msirange().range11().msirgsel().set_bit().msion().set_bit());
+            // Select MSI as clock source for usb48
+            unsafe { rcc.ccipr.modify(|_, w| w.clk48sel().bits(0b11)) };
+            // Wait until MSI is running
+            while rcc.cr.read().msirdy().bit_is_clear() {}
+        }
         Clocks {
             hclk: Hertz(hclk),
-            hsi48: self.hsi48,
             lsi: self.lsi,
+            usb48: self.usb48,
             pclk1: Hertz(pclk1),
             pclk2: Hertz(pclk2),
             ppre1,
@@ -477,6 +512,7 @@ impl CFGR {
             sysclk: Hertz(sysclk),
         }
     }
+
 }
 
 #[derive(Clone, Copy)]
@@ -496,7 +532,7 @@ pub struct PllConfig {
 #[derive(Clone, Copy, Debug)]
 pub struct Clocks {
     hclk: Hertz,
-    hsi48: bool,
+    usb48: bool,
     lsi: bool,
     pclk1: Hertz,
     pclk2: Hertz,
@@ -514,8 +550,8 @@ impl Clocks {
     }
 
     /// Returns status of HSI48
-    pub fn hsi48(&self) -> bool {
-        self.hsi48
+    pub fn usb48(&self) -> bool {
+        self.usb48
     }
 
     /// Returns status of HSI48
