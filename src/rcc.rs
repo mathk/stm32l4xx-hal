@@ -495,7 +495,7 @@ impl CFGR {
         }
 
         if cfg!(feature = "stm32l47x") && self.usb48 {
-            rcc.cr.modify(|_, w| w.msirange().range11().msirgsel().set_bit().msion().set_bit());
+            rcc.cr.modify(|_, w| w.msirange().range48m().msirgsel().set_bit().msion().set_bit());
             // Select MSI as clock source for usb48
             unsafe { rcc.ccipr.modify(|_, w| w.clk48sel().bits(0b11)) };
             // Wait until MSI is running

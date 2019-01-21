@@ -13,12 +13,14 @@ extern crate nb;
 extern crate panic_semihosting;
 
 extern crate stm32l4xx_hal as hal;
+extern crate mfxstm32l152 as mfx;
 // #[macro_use(block)]
 // extern crate nb;
 
 use cortex_m::asm;
 use crate::hal::prelude::*;
 use crate::hal::serial::Serial;
+use crate::hal::i2c::I2c;
 use crate::rt::ExceptionFrame;
 
 #[entry]
@@ -30,12 +32,15 @@ fn main() -> ! {
     // let mut gpioa = p.GPIOA.split(&mut rcc.ahb2);
     // let mut gpiob = p.GPIOB.split(&mut rcc.ahb2);
     let mut gpiod = p.GPIOD.split(&mut rcc.ahb2);
+    let mut gpiob = p.GPIOB.split(&mut rcc.ahb2);
 
     // clock configuration using the default settings (all clocks run at 8 MHz)
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
     // TRY this alternate clock configuration (clocks run at nearly the maximum frequency)
     // let clocks = rcc.cfgr.sysclk(64.mhz()).pclk1(32.mhz()).freeze(&mut flash.acr);
 
+
+    mfx::MFX::new()
     //let tx = gpioa.pa2.into_af7(&mut gpioa.moder, &mut gpioa.afrl);
     // let tx = gpiob.pb6.into_af7(&mut gpiob.moder, &mut gpiob.afrl);
     let tx = gpiod.pd5.into_af7(&mut gpiod.moder, &mut gpiod.afrl);
@@ -43,6 +48,11 @@ fn main() -> ! {
     // let rx = gpioa.pa3.into_af7(&mut gpioa.moder, &mut gpioa.afrl);
     // let rx = gpiob.pb7.into_af7(&mut gpiob.moder, &mut gpiob.afrl);
     let rx = gpiod.pd6.into_af7(&mut gpiod.moder, &mut gpiod.afrl);
+
+    let scl = gpiob.pb10.into_af7(&mut gpiob.moder, &mut gpiob.afrl);
+    let sda = gpiob.pb11.into_af7(&mut gpiob.moder, &mut gpiob.afrl);
+
+    let i2c = I2c::i2c2(p.I2C2, (scl, sda), 100.Khz, clocks)
 
      // TRY using a different USART peripheral here
     let serial = Serial::usart2(p.USART2, (tx, rx), 115_200.bps(), clocks, &mut rcc.apb1r1);
