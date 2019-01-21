@@ -4,7 +4,7 @@ use cast::u8;
 use crate::stm32::{I2C1, I2C2};
 
 use crate::gpio::gpioa::{PA10, PA9};
-use crate::gpio::gpiob::{PB6, PB7};
+use crate::gpio::gpiob::{PB6, PB7, PB10, PB11};
 use crate::gpio::{AF4, Alternate, OpenDrain, Output};
 use crate::hal::blocking::i2c::{Write, WriteRead, Read};
 use crate::rcc::{APB1R1, Clocks};
